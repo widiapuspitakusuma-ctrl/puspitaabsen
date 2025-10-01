@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Online Paskibra</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Library untuk export ke Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .login-card {
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            bottom: 30px;
+            transition: visibility 0s, opacity 0.5s linear;
+            opacity: 0;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <!-- Latar Belakang -->
+    <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('https://placehold.co/1920x1080/e2e8f0/334155?text=Latar+Paskibra'); opacity: 0.1;"></div>
+    </div>
+    
+    <div id="app" class="relative min-h-screen flex items-center justify-center p-4">
+
+        <!-- Halaman Login -->
+        <div id="loginPage" class="w-full max-w-md">
+            <div class="login-card border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-2xl">
+                <div class="text-center mb-8">
+                    <svg class="mx-auto h-16 w-16 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white mt-4">Absensi Paskibra</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-2">Silakan masuk untuk melanjutkan</p>
+                </div>
+
+                <!-- Form Login -->
+                <form id="loginForm" class="space-y-6">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Pengguna</label>
+                        <input type="text" id="username" name="username" required class="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Kata Sandi</label>
+                        <input type="password" id="password" name="password" required class="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                         <p class="text-xs text-gray-400 mt-2">Hint: Coba 'admin'/'admin' atau 'budi'/'user123'.</p>
+                    </div>
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
+                        Masuk
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Halaman Anggota (User) -->
+        <div id="userPage" class="hidden w-full max-w-4xl mx-auto">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold">Dashboard Anggota</h1>
+                        <p id="welcomeUser" class="text-gray-500 dark:text-gray-400 mt-1">Selamat datang!</p>
+                    </div>
+                    <button id="logoutUser" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">Keluar</button>
+                </div>
+
+                <!-- Form Absensi -->
+                <div id="attendanceFormContainer" class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg mb-6">
+                     <h2 class="text-xl font-semibold mb-4">Form Kehadiran Hari Ini</h2>
+                     <div id="attendanceDayWarning" class="hidden text-center p-4 mb-4 text-yellow-800 bg-yellow-100 rounded-lg">
+                        Absensi hanya bisa diisi pada hari Selasa dan Jumat.
+                     </div>
+                     <form id="attendanceForm" class="space-y-4">
+                         <div>
+                            <label class="block text-sm font-medium">Keterangan Kehadiran</label>
+                            <select id="attendanceStatus" class="mt-1 block w-full p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                <option value="Hadir">Hadir</option>
+                                <option value="Sakit">Sakit</option>
+                                <option value="Izin">Izin</option>
+                            </select>
+                         </div>
+                         <div id="reasonContainer" class="hidden">
+                             <label for="reason" class="block text-sm font-medium">Alasan (Sakit/Izin)</label>
+                             <textarea id="reason" rows="3" class="mt-1 block w-full p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"></textarea>
+                         </div>
+                         <button type="submit" id="submitAttendance" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition">Kirim Absensi</button>
+                     </form>
+                </div>
+                
+                <!-- Riwayat Absensi Pribadi -->
+                <div>
+                    <h2 class="text-xl font-semibold mb-4">Riwayat Absensi Anda</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tanggal</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Materi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userHistoryBody" class="divide-y divide-gray-200 dark:divide-gray-600">
+                                <!-- Data akan diisi oleh JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Halaman Admin -->
+        <div id="adminPage" class="hidden w-full max-w-6xl mx-auto">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold">Dashboard Admin</h1>
+                        <p class="text-gray-500 dark:text-gray-400 mt-1">Manajemen Absensi Ekstrakurikuler Paskibra.</p>
+                    </div>
+                    <button id="logoutAdmin" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">Keluar</button>
+                </div>
+
+                <!-- Input Materi Harian -->
+                 <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg mb-8">
+                     <h2 class="text-xl font-semibold mb-4">Materi Latihan Hari Ini</h2>
+                      <div class="flex flex-col sm:flex-row gap-4">
+                         <input type="text" id="materiInput" placeholder="Contoh: Latihan PBB Dasar" class="flex-grow p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                         <button id="saveMateri" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">Simpan Materi</button>
+                      </div>
+                 </div>
+
+                <!-- Rekapan Absensi -->
+                <div>
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Rekapan Kehadiran Anggota</h2>
+                        <button id="exportExcel" class="w-full md:w-auto mt-4 md:mt-0 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                              <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                           </svg>
+                           Unduh Rekapan (Excel)
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="rekapTable" class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nama Anggota</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Kelas</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Hadir</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Izin</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Sakit</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Alpha</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Kehadiran (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminRekapBody" class="divide-y divide-gray-200 dark:divide-gray-600">
+                                <!-- Data akan diisi oleh JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DATA SIMULASI (Pengganti Database) ---
+        // Di aplikasi nyata, data ini akan diambil dari server/database.
+        const users = [
+            { id: 1, username: 'admin', password: 'admin', role: 'admin' },
+            { id: 2, username: 'budi', password: 'user123', role: 'user', kelas: 'XI IPA 1' },
+            { id: 3, username: 'ani', password: 'user123', role: 'user', kelas: 'X-2' },
+            { id: 4, username: 'cindy', password: 'user123', role: 'user', kelas: 'XII IPS 3' },
+        ];
+
+        // Gunakan localStorage untuk menyimpan data absensi dan materi
+        let attendance = JSON.parse(localStorage.getItem('paskibraAttendance')) || [
+            { userId: 2, date: '2025-09-23', status: 'Hadir', materi: 'Latihan PBB Dasar' },
+            { userId: 3, date: '2025-09-23', status: 'Sakit', reason: 'Demam', materi: 'Latihan PBB Dasar' },
+            { userId: 4, date: '2025-09-23', status: 'Hadir', materi: 'Latihan PBB Dasar' },
+            { userId: 2, date: '2025-09-26', status: 'Hadir', materi: 'Formasi Barisan' },
+            { userId: 3, date: '2025-09-26', status: 'Hadir', materi: 'Formasi Barisan' },
+            { userId: 4, date: '2025-09-26', status: 'Izin', reason: 'Acara keluarga', materi: 'Formasi Barisan' },
+        ];
+        
+        let materials = JSON.parse(localStorage.getItem('paskibraMaterials')) || {
+             '2025-09-23': 'Latihan PBB Dasar',
+             '2025-09-26': 'Formasi Barisan',
+        };
+
+        let currentUser = null;
+
+        // --- ELEMEN DOM ---
+        const loginPage = document.getElementById('loginPage');
+        const userPage = document.getElementById('userPage');
+        const adminPage = document.getElementById('adminPage');
+        const loginForm = document.getElementById('loginForm');
+        
+        const logoutUserBtn = document.getElementById('logoutUser');
+        const logoutAdminBtn = document.getElementById('logoutAdmin');
+        
+        const attendanceStatusSelect = document.getElementById('attendanceStatus');
+        const reasonContainer = document.getElementById('reasonContainer');
+        
+        const submitAttendanceBtn = document.getElementById('submitAttendance');
+        const attendanceForm = document.getElementById('attendanceForm');
+
+        const exportExcelBtn = document.getElementById('exportExcel');
+        const saveMateriBtn = document.getElementById('saveMateri');
+        const materiInput = document.getElementById('materiInput');
+        
+        const toast = document.getElementById('toast');
+
+        // --- FUNGSI ---
+        
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('paskibraAttendance', JSON.stringify(attendance));
+            localStorage.setItem('paskibraMaterials', JSON.stringify(materials));
+        }
+
+        function getTodayDateString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function showPage(page) {
+            loginPage.classList.add('hidden');
+            userPage.classList.add('hidden');
+            adminPage.classList.add('hidden');
+            
+            if (page === 'login') loginPage.classList.remove('hidden');
+            if (page === 'user') userPage.classList.remove('hidden');
+            if (page === 'admin') adminPage.classList.remove('hidden');
+        }
+
+        function login(username, password) {
+            const user = users.find(u => u.username === username && u.password === password);
+            if (user) {
+                currentUser = user;
+                sessionStorage.setItem('paskibraCurrentUser', JSON.stringify(user));
+                if (user.role === 'admin') {
+                    renderAdminPage();
+                    showPage('admin');
+                } else {
+                    renderUserPage();
+                    showPage('user');
+                }
+                 showToast(`Selamat datang, ${currentUser.username}!`);
+            } else {
+                showToast('Nama pengguna atau kata sandi salah!');
+            }
+        }
+        
+        function logout() {
+            currentUser = null;
+            sessionStorage.removeItem('paskibraCurrentUser');
+            showPage('login');
+            loginForm.reset();
+        }
+
+        // --- RENDER HALAMAN USER ---
+        function renderUserPage() {
+            if (!currentUser) return;
+
+            document.getElementById('welcomeUser').textContent = `Selamat datang, ${currentUser.username} (${currentUser.kelas})!`;
+            
+            // Cek jadwal (Selasa=2, Jumat=5)
+            const todayDay = new Date().getDay();
+            const isScheduleDay = (todayDay === 2 || todayDay === 5);
+            const attendanceDayWarning = document.getElementById('attendanceDayWarning');
+            
+            if (!isScheduleDay) {
+                 attendanceDayWarning.classList.remove('hidden');
+                 submitAttendanceBtn.disabled = true;
+                 submitAttendanceBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                 attendanceDayWarning.classList.add('hidden');
+                 submitAttendanceBtn.disabled = false;
+                 submitAttendanceBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            // Cek apakah sudah absen hari ini
+            const todayDate = getTodayDateString();
+            const hasAttendedToday = attendance.some(a => a.userId === currentUser.id && a.date === todayDate);
+
+            if (hasAttendedToday) {
+                document.getElementById('attendanceFormContainer').innerHTML = `
+                    <div class="text-center p-4 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-lg">
+                        Anda sudah mengisi absensi hari ini. Terima kasih!
+                    </div>`;
+            }
+
+            // Tampilkan riwayat
+            const userHistoryBody = document.getElementById('userHistoryBody');
+            userHistoryBody.innerHTML = '';
+            const userHistory = attendance.filter(a => a.userId === currentUser.id).reverse();
+            
+            if (userHistory.length === 0) {
+                 userHistoryBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">Belum ada riwayat absensi.</td></tr>`;
+                 return;
+            }
+            
+            userHistory.forEach(att => {
+                let statusClass = '';
+                switch(att.status) {
+                    case 'Hadir': statusClass = 'bg-green-100 text-green-800'; break;
+                    case 'Sakit': statusClass = 'bg-yellow-100 text-yellow-800'; break;
+                    case 'Izin': statusClass = 'bg-blue-100 text-blue-800'; break;
+                    default: statusClass = 'bg-red-100 text-red-800';
+                }
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">${new Date(att.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${att.status}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${att.materi || '-'}</td>
+                    </tr>
+                `;
+                userHistoryBody.innerHTML += row;
+            });
+        }
+
+        // --- RENDER HALAMAN ADMIN ---
+        function renderAdminPage() {
+            const adminRekapBody = document.getElementById('adminRekapBody');
+            adminRekapBody.innerHTML = '';
+            
+            const memberUsers = users.filter(u => u.role === 'user');
+            const scheduleDays = [...new Set(attendance.map(a => a.date))]; // Semua tanggal latihan
+            
+            memberUsers.forEach(user => {
+                let hadir = 0, izin = 0, sakit = 0;
+                
+                const userAttendance = attendance.filter(a => a.userId === user.id);
+                userAttendance.forEach(att => {
+                    if (att.status === 'Hadir') hadir++;
+                    else if (att.status === 'Izin') izin++;
+                    else if (att.status === 'Sakit') sakit++;
+                });
+
+                const alpha = scheduleDays.length - (hadir + izin + sakit);
+                const totalKehadiran = hadir + izin + sakit;
+                const totalPertemuan = scheduleDays.length;
+                const persentase = totalPertemuan > 0 ? ((hadir / totalPertemuan) * 100).toFixed(1) : 0;
+
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap font-medium">${user.username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${user.kelas}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">${hadir}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">${izin}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">${sakit}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">${alpha > 0 ? alpha : 0}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center font-semibold">${persentase}%</td>
+                    </tr>
+                `;
+                adminRekapBody.innerHTML += row;
+            });
+
+            // Tampilkan materi hari ini jika sudah ada
+            const todayDate = getTodayDateString();
+            materiInput.value = materials[todayDate] || '';
+        }
+
+        // --- EVENT LISTENERS ---
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = e.target.username.value;
+            const password = e.target.password.value;
+            login(username, password);
+        });
+        
+        logoutUserBtn.addEventListener('click', logout);
+        logoutAdminBtn.addEventListener('click', logout);
+
+        attendanceStatusSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Sakit' || e.target.value === 'Izin') {
+                reasonContainer.classList.remove('hidden');
+            } else {
+                reasonContainer.classList.add('hidden');
+            }
+        });
+
+        attendanceForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const status = document.getElementById('attendanceStatus').value;
+            const reason = document.getElementById('reason').value;
+            const todayDate = getTodayDateString();
+
+            const newAttendance = {
+                userId: currentUser.id,
+                date: todayDate,
+                status: status,
+                materi: materials[todayDate] || "Belum diisi"
+            };
+
+            if (status !== 'Hadir') {
+                newAttendance.reason = reason;
+            }
+
+            attendance.push(newAttendance);
+            saveToLocalStorage();
+            showToast('Absensi berhasil direkam!');
+            renderUserPage(); // Re-render untuk menampilkan pesan "sudah absen"
+        });
+        
+        saveMateriBtn.addEventListener('click', () => {
+            const todayDate = getTodayDateString();
+            const materi = materiInput.value.trim();
+            if (materi) {
+                materials[todayDate] = materi;
+                saveToLocalStorage();
+                showToast('Materi berhasil disimpan!');
+            } else {
+                showToast('Materi tidak boleh kosong.');
+            }
+        });
+
+        exportExcelBtn.addEventListener('click', () => {
+            const table = document.getElementById('rekapTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: "Rekapan Absensi" });
+            XLSX.writeFile(wb, "Rekapan-Absensi-Paskibra.xlsx");
+        });
+
+        // --- INISIALISASI ---
+        function initialize() {
+            const storedUser = sessionStorage.getItem('paskibraCurrentUser');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
+                if (currentUser.role === 'admin') {
+                    renderAdminPage();
+                    showPage('admin');
+                } else {
+                    renderUserPage();
+                    showPage('user');
+                }
+            } else {
+                showPage('login');
+            }
+        }
+
+        initialize();
+    });
+    </script>
+</body>
+</html>
